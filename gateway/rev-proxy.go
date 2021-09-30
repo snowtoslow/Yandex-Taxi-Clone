@@ -1,11 +1,10 @@
 package main
 
 import (
-	"crypto/tls"
-	"golang.org/x/net/http2"
-	"io/ioutil"
+	v1 "Yandex-Taxi-Clone/pkg/api/v1"
+	"context"
+	"google.golang.org/grpc"
 	"log"
-	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -31,27 +30,16 @@ func main() {
 			proxyPath = proxyPath[:len(proxyPath)-1]
 		}
 		req.URL.Path = proxyPath
+		req.Proto = "HTTP/2.0"
 	}
 	proxy := &Upstream{target: url, proxy: &httputil.ReverseProxy{
 		Director: director,
-		Transport: &http2.Transport{
-			AllowHTTP: true,
-			DialTLS: func(network, addr string, cfg *tls.Config) (net.Conn, error) {
-				ta, err := net.ResolveTCPAddr(network, addr)
-				if err != nil {
-					return nil, err
-				}
-
-				return net.DialTCP(network, nil, ta)
-			},
+		Transport: &CustomProtocol{
+			Host:    "localhost:8086",
+			Context: context.Background(),
 		},
 		ModifyResponse: func(response *http.Response) error {
-			defer response.Body.Close()
-			bytes, err := ioutil.ReadAll(response.Body)
-			if err != nil {
-				return err
-			}
-			log.Printf("%s", bytes)
+			log.Printf("%+v", response)
 			return nil
 		},
 	}}
@@ -59,6 +47,11 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", proxy.handle)
 	log.Fatal(http.ListenAndServe(":9001", mux))
+	/*http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		proxy.proxy.ServeHTTP(w, r)
+	})
+
+	log.Fatal(http.ListenAndServe(":9001", nil))*/
 
 }
 
@@ -84,48 +77,26 @@ func singleJoiningSlash(a, b string) string {
 	return a + b
 }
 
-/*func main() {
-	origin, _ := url.Parse("http://localhost:8086/")
-	path := "/*catchall"
+type CustomProtocol struct {
+	Host    string
+	Context context.Context
+}
 
-	//p := httputil.NewSingleHostReverseProxy(origin)
-	director := func(req *http.Request) {
-		req.Header.Add("X-Forwarded-Host", req.Host)
-		req.Header.Add("X-Origin-Host", origin.Host)
-		req.URL.Scheme = origin.Scheme
-		req.URL.Host = origin.Host
-
-		wildcardIndex := strings.IndexAny(path, "*")
-		proxyPath := singleJoiningSlash(origin.Path, req.URL.Path[wildcardIndex:])
-		if strings.HasSuffix(proxyPath, "/") && len(proxyPath) > 1 {
-			proxyPath = proxyPath[:len(proxyPath)-1]
-		}
-		req.URL.Path = proxyPath
-
+func (custom *CustomProtocol) RoundTrip(req *http.Request) (*http.Response, error) {
+	conn, err := grpc.Dial(custom.Host, grpc.WithInsecure())
+	if err != nil {
+		return nil, err
 	}
+	//defer conn.Close()
 
-	modifyResponse := func(response *http.Response) error {
-		return nil
+	a := new(v1.CreateResponse)
+	if err = conn.Invoke(custom.Context, "/v1.UrlShortnerService/Create", &v1.CreateRequest{
+		Url: "https://www.google.com/search?client",
+	}, a); err != nil {
+		log.Println("error:", err)
+		return nil, err
 	}
+	log.Println("AAAA: ", a)
 
-	proxy := &httputil.ReverseProxy{
-		Director: director,
-		ModifyResponse: modifyResponse,
-		Transport: &http2.Transport{
-			AllowHTTP: true,
-			DialTLS: func(network, addr string, cfg *tls.Config) (net.Conn, error) {
-				ta, err := net.ResolveTCPAddr(network, addr)
-				if err != nil {
-					return nil, err
-				}
-				return net.DialTCP(network, nil, ta)
-			},
-		},
-	}
-
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		proxy.ServeHTTP(w, r)
-	})
-
-	log.Fatal(http.ListenAndServe(":9001", nil))
-}*/
+	return &http.Response{}, nil
+}
