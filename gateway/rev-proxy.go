@@ -2,8 +2,10 @@ package main
 
 import (
 	v1 "Yandex-Taxi-Clone/pkg/api/v1"
+	"bytes"
 	"context"
 	"google.golang.org/grpc"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/http/httputil"
@@ -44,14 +46,14 @@ func main() {
 		},
 	}}
 
-	mux := http.NewServeMux()
+	/*mux := http.NewServeMux()
 	mux.HandleFunc("/", proxy.handle)
-	log.Fatal(http.ListenAndServe(":9001", mux))
-	/*http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	log.Fatal(http.ListenAndServe(":9001", mux))*/
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		proxy.proxy.ServeHTTP(w, r)
 	})
 
-	log.Fatal(http.ListenAndServe(":9001", nil))*/
+	log.Fatal(http.ListenAndServe(":9001", nil))
 
 }
 
@@ -87,7 +89,7 @@ func (custom *CustomProtocol) RoundTrip(req *http.Request) (*http.Response, erro
 	if err != nil {
 		return nil, err
 	}
-	//defer conn.Close()
+	defer conn.Close()
 
 	a := new(v1.CreateResponse)
 	if err = conn.Invoke(custom.Context, "/v1.UrlShortnerService/Create", &v1.CreateRequest{
@@ -98,5 +100,12 @@ func (custom *CustomProtocol) RoundTrip(req *http.Request) (*http.Response, erro
 	}
 	log.Println("AAAA: ", a)
 
-	return &http.Response{}, nil
+	return &http.Response{
+		Status:     "Status",
+		StatusCode: http.StatusOK,
+		Header: map[string][]string{
+			"Content-Type": {"application/json"},
+		},
+		Body: ioutil.NopCloser(ioutil.NopCloser(bytes.NewBufferString("Hello World"))),
+	}, nil
 }
