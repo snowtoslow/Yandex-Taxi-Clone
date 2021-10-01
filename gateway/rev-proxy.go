@@ -100,12 +100,14 @@ func (custom *CustomProtocol) RoundTrip(req *http.Request) (*http.Response, erro
 	}
 	log.Println("AAAA: ", a)
 
+	//Create custom httpResponses for status ok, unautorized and bad request
 	return &http.Response{
-		Status:     "Status",
+		Status:     http.StatusText(http.StatusOK),
 		StatusCode: http.StatusOK,
 		Header: map[string][]string{
 			"Content-Type": {"application/json"},
 		},
-		Body: ioutil.NopCloser(ioutil.NopCloser(bytes.NewBufferString("Hello World"))),
+		Body:    ioutil.NopCloser(ioutil.NopCloser(bytes.NewBufferString("Hello World"))),
+		Request: req,
 	}, nil
 }
