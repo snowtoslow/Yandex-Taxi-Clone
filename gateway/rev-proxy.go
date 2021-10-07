@@ -26,6 +26,8 @@ func main() {
 		req.Header.Add("X-Origin-Host", url.Host)
 		req.URL.Scheme = url.Scheme
 		req.URL.Host = url.Host
+		//ADD CORS - to allow access of magic-costet-front-end:
+		req.Header.Add("Access-Control-Allow-Origin", "*")
 
 		wildcardIndex := strings.IndexAny(path, "*")
 		proxyPath := singleJoiningSlash(url.Path, req.URL.Path[wildcardIndex:])
