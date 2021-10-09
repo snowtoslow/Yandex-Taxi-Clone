@@ -10,14 +10,11 @@ type CustomTransport struct {
 	Context context.Context
 }
 
-func New(host string, ctx context.Context) CustomTransport {
-	return CustomTransport{
-		Host:    host,
-		Context: ctx,
-	}
+func (custom *CustomTransport) SetHost(host string) {
+	custom.Host = host
 }
 
-func (custom CustomTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+func (custom *CustomTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	/*conn, err := grpc.Dial(custom.Host, grpc.WithInsecure())
 	if err != nil {
 		return nil, err

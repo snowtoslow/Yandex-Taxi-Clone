@@ -4,54 +4,29 @@ import (
 	"Yandex-Taxi-Clone/internal/cache/redis-storage"
 	"Yandex-Taxi-Clone/internal/gateway"
 	"Yandex-Taxi-Clone/internal/gateway/models"
+	"Yandex-Taxi-Clone/internal/transport"
 	"fmt"
 	"github.com/go-redis/redis/v8"
-	"log"
 	"net/http"
-	"net/http/httputil"
-	"strings"
 )
 
 func Run(config models.Config) error {
-	log.Printf("%+v", config)
-	proxy := httputil.ReverseProxy{
-		Director: func(req *http.Request) {
-			switch a := strings.Split(req.URL.Path, "/")[2]; a {
-			case "auth":
-				for _, v := range config.Services {
-					if v.ServiceIdentifier == a {
-						host := fmt.Sprintf("%s:%d", v.Host, v.Port)
-						req.Header.Add("X-Forwarded-Host", req.Host)
-						req.Header.Add("X-Origin-Host", host)
-						req.URL.Scheme = "http"
-						req.URL.Host = host
-						//ADD CORS - to allow access of magic-costet-front-end:
-						req.Header.Add("Access-Control-Allow-Origin", "*")
-						break
-					}
-				}
-
-			}
-
-		},
-		ModifyResponse: func(response *http.Response) error {
-			return nil
-			//
-			// purposefully return an error so ErrorHandler gets called
-			//return errors.New("uh-oh")
-		},
-		ErrorHandler: func(rw http.ResponseWriter, r *http.Request, err error) {
-			fmt.Printf("error was: %+v", err)
-			rw.WriteHeader(http.StatusInternalServerError)
-			rw.Write([]byte(err.Error()))
-		},
-	}
-
+	//Create redis client
 	redisClient := newRedisClient(config.Redis.Host, config.Redis.Port)
 
+	//Create cache storage;
 	cache := redis_storage.New(redisClient)
 
-	apiGateway := gateway.New(&proxy, ":9001", cache, config.Services)
+	//Create gateway;
+	apiGateway := gateway.New(":9001", cache, config.Services, &transport.CustomTransport{})
+
+	// creates logic for httputil.ReverseProxy;
+	apiGateway.CreateProxy()
+
+	//Register auth service
+	if err := apiGateway.RegisterService("auth"); err != nil {
+		return err
+	}
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		apiGateway.ReverseProxy.ServeHTTP(w, r)

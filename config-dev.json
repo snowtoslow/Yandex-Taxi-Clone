@@ -11,7 +11,7 @@
       "routes": [
         {
           "gateway_path": "/register",
-          "service_path" : "/authenticate"
+          "service_path": "/authenticate"
         }
       ]
     }
