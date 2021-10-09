@@ -1,22 +1,6 @@
 package main
 
-import (
-	v1 "Yandex-Taxi-Clone/pkg/api/v1"
-	"bytes"
-	"context"
-	"fmt"
-	jwt "github.com/golang-jwt/jwt/v4"
-	"google.golang.org/grpc"
-	"io/ioutil"
-	"log"
-	"net/http"
-	"net/http/httputil"
-	"net/url"
-	"os"
-	"strings"
-)
-
-func main() {
+/*func main() {
 	log.SetPrefix("[proxy] ")
 	log.SetOutput(os.Stdout)
 	url, _ := url.Parse("http://localhost:8080")
@@ -131,4 +115,4 @@ func (custom *CustomProtocol) RoundTrip(req *http.Request) (*http.Response, erro
 		Body:    ioutil.NopCloser(ioutil.NopCloser(bytes.NewBufferString("Hello World"))),
 		Request: req,
 	}, nil
-}
+}*/
