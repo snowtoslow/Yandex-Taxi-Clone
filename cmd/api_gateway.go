@@ -5,12 +5,16 @@ import (
 	"Yandex-Taxi-Clone/internal/gateway"
 	"Yandex-Taxi-Clone/internal/gateway/models"
 	"Yandex-Taxi-Clone/internal/transport"
+	"context"
 	"fmt"
 	"github.com/go-redis/redis/v8"
 	"net/http"
 )
 
 func Run(config models.Config) error {
+
+	ctx := context.Background()
+
 	//Create redis client
 	redisClient := newRedisClient(config.Redis.Host, config.Redis.Port)
 
@@ -18,7 +22,9 @@ func Run(config models.Config) error {
 	cache := redis_storage.New(redisClient)
 
 	//Create gateway;
-	apiGateway := gateway.New(":9001", cache, config.Services, &transport.CustomTransport{})
+	apiGateway := gateway.New(":9001", cache, config.Services, &transport.CustomTransport{
+		Context: ctx,
+	})
 
 	// creates logic for httputil.ReverseProxy;
 	apiGateway.CreateProxy()

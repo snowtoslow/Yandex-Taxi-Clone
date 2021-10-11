@@ -1,0 +1,47 @@
+syntax = "proto3";
+package v1;
+option go_package = "/pkg/api/v1";
+
+
+message NotificationCreateRequest{
+  Coordinates from = 1;
+
+  Coordinates to = 2;
+
+  NotificationStatus status = 3;
+}
+
+message NotificationCreateResponse{
+  Coordinates from = 1;
+}
+
+message NotificationSetStatusRequest{
+  string NotificationID = 1;
+  NotificationStatus status = 2;
+}
+
+
+message NotificationSetStatusResponse{}
+
+
+
+message Coordinates {
+  float latitude = 1;
+  float longitude = 2;
+}
+
+enum NotificationStatus {
+  UNKNOWN_STATUS = 0;
+  CREATE_ORDER_ATTEMPT = 1;
+  FAILED_FOUND_ORDER = 2;
+  FINISHED = 3;
+}
+
+
+service NotificationService {
+  // Create new instance of URL
+  rpc Create(NotificationCreateRequest) returns (NotificationCreateResponse);
+
+  // Get the short URL of original URL
+  rpc SetStatus(NotificationSetStatusRequest) returns (NotificationSetStatusResponse);
+}

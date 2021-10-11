@@ -2,10 +2,12 @@ package transport
 
 import (
 	"Yandex-Taxi-Clone/internal/gateway/models"
+	v1 "Yandex-Taxi-Clone/pkg/api/v1"
 	"bytes"
 	"context"
 	"google.golang.org/grpc"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"strings"
 )
@@ -33,13 +35,42 @@ func (custom *CustomTransport) RoundTrip(req *http.Request) (*http.Response, err
 
 	for _, v := range custom.Routes {
 		if strings.Contains(v.GatewayPath, req.URL.Path) {
-			/*a := new(v1.CreateResponse)
-			if err = conn.Invoke(custom.Context, "/v1.UrlShortnerService/Create", &v1.CreateRequest{
-				Url: "https://www.google.com/search?client",
-			}, a); err != nil {
-				log.Println("error:", err)
+			var protoReq interface{}
+			var protoResp interface{}
+			reqBytes, err := ioutil.ReadAll(req.Body)
+			if err != nil {
 				return nil, err
-			}*/
+			}
+			splits := strings.Split(req.URL.Path, "/")
+			switch identifier := splits[2]; identifier {
+			case "notification":
+				switch method := splits[3]; method {
+				case "create":
+					createReq, err := models.ConvertToNotificationCreateRequest(reqBytes)
+					if err != nil {
+						return nil, err
+					}
+
+					protoReq = &v1.NotificationCreateRequest{
+						From: &v1.Coordinates{
+							Latitude:  createReq.From.Latitude,
+							Longitude: createReq.From.Longitude,
+						},
+						To: &v1.Coordinates{
+							Latitude:  createReq.To.Latitude,
+							Longitude: createReq.To.Longitude,
+						},
+						Status: v1.NotificationStatus_CREATE_ORDER_ATTEMPT,
+					}
+					protoResp = new(v1.NotificationCreateResponse)
+				}
+			}
+
+			if err = conn.Invoke(custom.Context, v.ServicePath, protoReq, protoResp); err != nil {
+				log.Println("error invoking:", err)
+				return nil, err
+			}
+
 		}
 	}
 
