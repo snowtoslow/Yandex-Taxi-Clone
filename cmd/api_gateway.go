@@ -28,6 +28,10 @@ func Run(config models.Config) error {
 		return err
 	}
 
+	if err := apiGateway.RegisterService("notification"); err != nil {
+		return err
+	}
+
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		apiGateway.ReverseProxy.ServeHTTP(w, r)
 	})

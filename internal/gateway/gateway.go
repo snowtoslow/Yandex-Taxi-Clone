@@ -69,11 +69,12 @@ func (apiGateway *ApiGateway) CreateProxy() {
 			req.Header.Add("X-Forwarded-Host", req.Host)
 			req.Header.Add("X-Origin-Host", srvInfo.Url)
 			req.URL.Scheme = "http"
-			req.URL.Host = srvInfo.Url
+			req.URL.Host = req.Host
 			req.Header.Add("Access-Control-Allow-Origin", "*")
 			if !strings.Contains(identifier, "/auth") {
 				req.Proto = "HTTP/2.0"
 				apiGateway.Transport.SetHost(srvInfo.Url)
+				apiGateway.Transport.SetRoutes(srvInfo.Routes)
 				apiGateway.SetTransport(apiGateway.Transport)
 			}
 
