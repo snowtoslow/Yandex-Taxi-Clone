@@ -20,17 +20,17 @@
       ]
     },
     {
-      "service_identifier": "notification",
+      "service_identifier": "car",
       "host": "localhost",
       "port": 8082,
       "routes": [
         {
-          "gateway_path": "/api/notification/create",
-          "service_path": "/v1.NotificationService/Create"
+          "gateway_path": "/api/car/create",
+          "service_path": "/v1.CarService/Create"
         },
         {
-          "gateway_path": "/api/notification/set_status",
-          "service_path": "/v1.NotificationService/SetStatus"
+          "gateway_path": "/api/car/find",
+          "service_path": "/v1.CarService/Find"
         }
       ]
     }

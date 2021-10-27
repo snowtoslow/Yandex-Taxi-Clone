@@ -26,11 +26,10 @@ func (rr redisRepository) SetCachedData(ctx context.Context, key string, value i
 	return nil
 }
 
-//TODO: should be unmarshaled
-func (rr redisRepository) GetCachedData(ctx context.Context, key string) string {
+func (rr redisRepository) GetCachedData(ctx context.Context, key string) (string, error) {
 	val, err := rr.storage.Get(ctx, key).Result()
 	if err != nil {
-		panic(err)
+		return "", err
 	}
-	return val
+	return val, nil
 }

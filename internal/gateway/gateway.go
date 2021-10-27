@@ -27,13 +27,11 @@ type serviceInformation struct {
 
 func New(
 	port string,
-	repo cache.Repository,
 	serviceFromConfig models.Services,
 	customTransport *transport.CustomTransport,
 ) *ApiGateway {
 	return &ApiGateway{
 		Port:                  port,
-		Cache:                 repo,
 		Services:              map[string]serviceInformation{},
 		ServiceInfoFromConfig: serviceFromConfig,
 		Transport:             customTransport,

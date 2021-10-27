@@ -22,8 +22,9 @@ func Run(config models.Config) error {
 	cache := redis_storage.New(redisClient)
 
 	//Create gateway;
-	apiGateway := gateway.New(":9001", cache, config.Services, &transport.CustomTransport{
+	apiGateway := gateway.New(":9001", config.Services, &transport.CustomTransport{
 		Context: ctx,
+		Cache:   cache,
 	})
 
 	// creates logic for httputil.ReverseProxy;
@@ -34,7 +35,7 @@ func Run(config models.Config) error {
 		return err
 	}
 
-	if err := apiGateway.RegisterService("notification"); err != nil {
+	if err := apiGateway.RegisterService("car"); err != nil {
 		return err
 	}
 
