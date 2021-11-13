@@ -5,9 +5,11 @@ import (
 	"Yandex-Taxi-Clone/internal/gateway/models"
 	"bytes"
 	"context"
+	"errors"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/encoding"
+	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"strings"
 )
@@ -28,7 +30,12 @@ func (custom *CustomTransport) SetRoutes(routes []models.Route) {
 }
 
 func (custom *CustomTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	conn, err := grpc.Dial(custom.Host, grpc.WithInsecure())
+	encoding.RegisterCodec(rawCodec{})
+	conn, err := grpc.Dial(
+		"localhost:8082",
+		grpc.WithInsecure(),
+		grpc.WithDefaultCallOptions(grpc.CallContentSubtype("myCodec")),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -36,71 +43,38 @@ func (custom *CustomTransport) RoundTrip(req *http.Request) (*http.Response, err
 
 	for _, v := range custom.Routes {
 		if strings.Contains(v.GatewayPath, req.URL.Path) {
-			/*var protoReq interface{}
-			var protoResp interface{}*/
 			reqBytes, err := ioutil.ReadAll(req.Body)
 			if err != nil {
-				return nil, err
+				return createResponse(err, nil, req), nil
 			}
-			splits := strings.Split(req.URL.Path, "/")
-			switch identifier := splits[2]; identifier {
-			case "car":
-				switch method := splits[3]; method {
-				case "find":
-					findCarReq, err := models.ToFindCarRequest(reqBytes)
-					if err != nil {
-						return nil, err
+
+			req.Header.Set("Content-Type", "application/grpc+rawCodec")
+			clientStream, err := grpc.NewClientStream(custom.Context, &grpc.StreamDesc{
+				ServerStreams: true,
+				ClientStreams: true,
+			}, conn, v.ServicePath)
+			if err != nil {
+				return createResponse(err, nil, req), nil
+			}
+
+			errCh1 := sendRequestToBackend(clientStream, reqBytes)
+			errCh2, retChan := retrieveResponseFromBackEnd(clientStream)
+			for i := 0; i < 3; i++ {
+				select {
+				case magErr := <-errCh1:
+					if !errors.Is(magErr, io.EOF) {
+						return createResponse(magErr, nil, req), nil
 					}
-
-					cachedData, err := custom.Cache.GetCachedData(custom.Context, findCarReq.Status)
-					if err != nil && err.Error() != "redis: nil" {
-						return nil, err
+					clientStream.CloseSend()
+				case magErr2 := <-errCh2:
+					if !errors.Is(magErr2, io.EOF) {
+						return createResponse(magErr2, nil, req), nil
 					}
-
-					if len(cachedData) == 0 {
-						protoReq, protoResp, err := models.FindCarRequestToProtoObject(findCarReq)
-						if err != nil {
-							return nil, err
-						}
-						if err = conn.Invoke(custom.Context, v.ServicePath, protoReq, protoResp); err != nil {
-							log.Println("error invoking:", err)
-							return nil, err
-						}
-
-						carBytes, err := models.ProtoRespToCarModelBytes(protoResp)
-						if err != nil {
-							return nil, err
-						}
-
-						if err = custom.Cache.
-							SetCachedData(custom.Context, protoReq.Status.String(), carBytes); err != nil {
-							return nil, err
-						}
-
-						return &http.Response{
-							Status:     http.StatusText(http.StatusOK),
-							StatusCode: http.StatusOK,
-							Header: map[string][]string{
-								"Content-Type": {"application/json"},
-							},
-							Body:    ioutil.NopCloser(ioutil.NopCloser(bytes.NewBufferString("To set cached data"))),
-							Request: req,
-						}, nil
-					} else {
-						log.Println("NOT CACHED DATA")
-					}
-					return &http.Response{
-						Status:     http.StatusText(http.StatusOK),
-						StatusCode: http.StatusOK,
-						Header: map[string][]string{
-							"Content-Type": {"application/json"},
-						},
-						Body:    ioutil.NopCloser(ioutil.NopCloser(bytes.NewBufferString(cachedData))),
-						Request: req,
-					}, nil
-
+				case response := <-retChan:
+					return createResponse(nil, response, req), nil
 				}
 			}
+
 		}
 	}
 
@@ -114,4 +88,39 @@ func (custom *CustomTransport) RoundTrip(req *http.Request) (*http.Response, err
 		Body:    ioutil.NopCloser(ioutil.NopCloser(bytes.NewBufferString("Hello World"))),
 		Request: req,
 	}, nil
+}
+
+func retrieveResponseFromBackEnd(stream grpc.ClientStream) (chan error, chan []byte) {
+	errCh := make(chan error, 1)
+	retChan := make(chan []byte, 1)
+	var a []byte
+	go func() {
+		for {
+			if err := stream.RecvMsg(&a); err != nil {
+				if errors.Is(err, io.EOF) {
+					retChan <- a
+				}
+				errCh <- err
+				break
+			}
+		}
+
+	}()
+
+	return errCh, retChan
+}
+
+func sendRequestToBackend(stream grpc.ClientStream, info []byte) chan error {
+	ret := make(chan error, 1)
+	go func() {
+		for {
+			if err := stream.SendMsg(&info); err != nil {
+				ret <- err
+
+				break
+			}
+		}
+
+	}()
+	return ret
 }

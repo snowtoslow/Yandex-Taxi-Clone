@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/httputil"
+	"net/url"
 	"strings"
 )
 
@@ -21,7 +22,7 @@ type ApiGateway struct {
 }
 
 type serviceInformation struct {
-	Url    string
+	Url    *url.URL
 	Routes []models.Route
 }
 
@@ -45,7 +46,9 @@ func (apiGateway *ApiGateway) RegisterService(identifier string) error {
 	}
 
 	apiGateway.Services[identifier] = serviceInformation{
-		Url:    fmt.Sprintf("%s:%d", host, port),
+		Url: &url.URL{
+			Host: fmt.Sprintf("%s:%d", host, port),
+		},
 		Routes: routes,
 	}
 	return nil
@@ -65,17 +68,17 @@ func (apiGateway *ApiGateway) CreateProxy() {
 				log.Fatalf("Can't find provided service by identifier: %s", identifier)
 			}
 			req.Header.Add("X-Forwarded-Host", req.Host)
-			req.Header.Add("X-Origin-Host", srvInfo.Url)
+			req.Header.Add("X-Origin-Host", srvInfo.Url.Host)
 			req.URL.Scheme = "http"
 			req.URL.Host = req.Host
 			req.Header.Add("Access-Control-Allow-Origin", "*")
 			if !strings.Contains(identifier, "/auth") {
 				req.Proto = "HTTP/2.0"
-				apiGateway.Transport.SetHost(srvInfo.Url)
+				apiGateway.Transport.SetHost(srvInfo.Url.Host)
 				apiGateway.Transport.SetRoutes(srvInfo.Routes)
 				apiGateway.SetTransport(apiGateway.Transport)
 			}
-
+			//apiGateway.SetTransport(http.DefaultTransport)
 		},
 		ErrorHandler: func(rw http.ResponseWriter, r *http.Request, err error) {
 			fmt.Printf("error was: %+v", err)

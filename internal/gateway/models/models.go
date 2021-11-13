@@ -43,14 +43,3 @@ type Route struct {
 	GatewayPath string `json:"gateway_path"`
 	ServicePath string `json:"service_path"`
 }
-
-/*
-type Routes []Route
-
-func (rs Routes) ValidateRoute(route string) {
-	for _, v := range rs {
-		if v. == route {
-
-		}
-	}
-}*/
