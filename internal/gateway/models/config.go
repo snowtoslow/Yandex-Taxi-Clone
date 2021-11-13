@@ -2,13 +2,7 @@ package models
 
 import (
 	"fmt"
-	"github.com/golang-jwt/jwt/v4"
 )
-
-type myClaims struct {
-	auth []string
-	jwt.RegisteredClaims
-}
 
 // Config structure handle the whole information about the configs;
 type Config struct {
@@ -29,13 +23,13 @@ type Service struct {
 
 type Services []Service
 
-func (ss Services) GetInfoFromServiceConfig(identifier string) (string, int, []Route, error) {
+func (ss Services) GetInfoFromServiceConfig(identifier string) (string, []Route, error) {
 	for _, v := range ss {
 		if v.ServiceIdentifier == identifier {
-			return v.Host, v.Port, v.Routes, nil
+			return fmt.Sprintf("%s:%d", v.Host, v.Port), v.Routes, nil
 		}
 	}
-	return "", 0, nil, fmt.Errorf("no routes by provided identifier")
+	return "", nil, fmt.Errorf("no routes by provided identifier")
 }
 
 // Route struct which handles the mapping of gateway url path's to grpc Methods or auth paths;

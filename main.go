@@ -2,9 +2,11 @@ package main
 
 import (
 	"Yandex-Taxi-Clone/cmd"
+	"Yandex-Taxi-Clone/internal/gateway"
 	"Yandex-Taxi-Clone/internal/gateway/models"
 	"encoding/json"
 	"fmt"
+	"google.golang.org/grpc/encoding"
 	"log"
 	"os"
 )
@@ -19,6 +21,8 @@ func init() {
 	}
 	jsonParser := json.NewDecoder(configFile)
 	jsonParser.Decode(&config)
+
+	encoding.RegisterCodec(gateway.RawCodec{})
 }
 
 func main() {

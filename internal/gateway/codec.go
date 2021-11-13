@@ -1,10 +1,10 @@
-package transport
+package gateway
 
 import "errors"
 
-type rawCodec struct{}
+type RawCodec struct{}
 
-func (r rawCodec) Marshal(v interface{}) ([]byte, error) {
+func (r RawCodec) Marshal(v interface{}) ([]byte, error) {
 	out, ok := v.(*[]byte)
 	if !ok {
 		return nil, errors.New("no bytes")
@@ -12,7 +12,7 @@ func (r rawCodec) Marshal(v interface{}) ([]byte, error) {
 	return *out, nil
 }
 
-func (r rawCodec) Unmarshal(data []byte, v interface{}) error {
+func (r RawCodec) Unmarshal(data []byte, v interface{}) error {
 	dest, ok := v.(*[]byte)
 	if !ok {
 		return errors.New("invalid cast type")
@@ -23,6 +23,6 @@ func (r rawCodec) Unmarshal(data []byte, v interface{}) error {
 	return nil
 }
 
-func (r rawCodec) Name() string {
+func (r RawCodec) Name() string {
 	return "myCodec"
 }

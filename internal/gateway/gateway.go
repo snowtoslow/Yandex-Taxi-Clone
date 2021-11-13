@@ -5,6 +5,7 @@ import (
 	"Yandex-Taxi-Clone/internal/gateway/models"
 	"Yandex-Taxi-Clone/internal/transport"
 	"fmt"
+	"google.golang.org/grpc"
 	"log"
 	"net/http"
 	"net/http/httputil"
@@ -22,8 +23,9 @@ type ApiGateway struct {
 }
 
 type serviceInformation struct {
-	Url    *url.URL
-	Routes []models.Route
+	Url     *url.URL
+	Routes  []models.Route
+	grpcCon *grpc.ClientConn
 }
 
 func New(
@@ -40,14 +42,14 @@ func New(
 }
 
 func (apiGateway *ApiGateway) RegisterService(identifier string) error {
-	host, port, routes, err := apiGateway.ServiceInfoFromConfig.GetInfoFromServiceConfig(identifier)
+	host, routes, err := apiGateway.ServiceInfoFromConfig.GetInfoFromServiceConfig(identifier)
 	if err != nil {
 		return err
 	}
 
 	apiGateway.Services[identifier] = serviceInformation{
 		Url: &url.URL{
-			Host: fmt.Sprintf("%s:%d", host, port),
+			Host: host,
 		},
 		Routes: routes,
 	}
@@ -62,7 +64,6 @@ func (apiGateway *ApiGateway) CreateProxy() {
 	apiGateway.ReverseProxy = &httputil.ReverseProxy{
 		Director: func(req *http.Request) {
 			identifier := strings.Split(req.URL.Path, "/")[2]
-			log.Println("IDENTIFIER: ", identifier)
 			srvInfo, ok := apiGateway.Services[identifier]
 			if !ok {
 				log.Fatalf("Can't find provided service by identifier: %s", identifier)
@@ -74,11 +75,12 @@ func (apiGateway *ApiGateway) CreateProxy() {
 			req.Header.Add("Access-Control-Allow-Origin", "*")
 			if !strings.Contains(identifier, "/auth") {
 				req.Proto = "HTTP/2.0"
-				apiGateway.Transport.SetHost(srvInfo.Url.Host)
+				apiGateway.Transport.SetGrpcConnection(srvInfo.grpcCon)
 				apiGateway.Transport.SetRoutes(srvInfo.Routes)
 				apiGateway.SetTransport(apiGateway.Transport)
+			} else {
+				apiGateway.SetTransport(http.DefaultTransport)
 			}
-			//apiGateway.SetTransport(http.DefaultTransport)
 		},
 		ErrorHandler: func(rw http.ResponseWriter, r *http.Request, err error) {
 			fmt.Printf("error was: %+v", err)

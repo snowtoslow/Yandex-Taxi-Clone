@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/encoding"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -15,14 +14,14 @@ import (
 )
 
 type CustomTransport struct {
-	Host    string
-	Context context.Context
-	Routes  []models.Route
-	Cache   cache.Repository
+	Context  context.Context
+	grpcConn *grpc.ClientConn
+	Routes   []models.Route
+	Cache    cache.Repository
 }
 
-func (custom *CustomTransport) SetHost(host string) {
-	custom.Host = host
+func (custom *CustomTransport) SetGrpcConnection(grpcConn *grpc.ClientConn) {
+	custom.grpcConn = grpcConn
 }
 
 func (custom *CustomTransport) SetRoutes(routes []models.Route) {
@@ -30,17 +29,6 @@ func (custom *CustomTransport) SetRoutes(routes []models.Route) {
 }
 
 func (custom *CustomTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	encoding.RegisterCodec(rawCodec{})
-	conn, err := grpc.Dial(
-		"localhost:8082",
-		grpc.WithInsecure(),
-		grpc.WithDefaultCallOptions(grpc.CallContentSubtype("myCodec")),
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer conn.Close()
-
 	for _, v := range custom.Routes {
 		if strings.Contains(v.GatewayPath, req.URL.Path) {
 			reqBytes, err := ioutil.ReadAll(req.Body)
@@ -52,7 +40,7 @@ func (custom *CustomTransport) RoundTrip(req *http.Request) (*http.Response, err
 			clientStream, err := grpc.NewClientStream(custom.Context, &grpc.StreamDesc{
 				ServerStreams: true,
 				ClientStreams: true,
-			}, conn, v.ServicePath)
+			}, custom.grpcConn, v.ServicePath)
 			if err != nil {
 				return createResponse(err, nil, req), nil
 			}
@@ -74,7 +62,7 @@ func (custom *CustomTransport) RoundTrip(req *http.Request) (*http.Response, err
 					return createResponse(nil, response, req), nil
 				}
 			}
-
+			break
 		}
 	}
 
