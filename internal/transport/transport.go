@@ -1,68 +1,48 @@
 package transport
 
 import (
-	"Yandex-Taxi-Clone/internal/cache"
 	"Yandex-Taxi-Clone/internal/gateway/models"
+	"Yandex-Taxi-Clone/utils"
 	"bytes"
 	"context"
-	"errors"
 	"google.golang.org/grpc"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"strings"
 )
 
 type CustomTransport struct {
-	Context  context.Context
-	grpcConn *grpc.ClientConn
-	Routes   []models.Route
-	Cache    cache.Repository
-}
-
-func (custom *CustomTransport) SetGrpcConnection(grpcConn *grpc.ClientConn) {
-	custom.grpcConn = grpcConn
-}
-
-func (custom *CustomTransport) SetRoutes(routes []models.Route) {
-	custom.Routes = routes
+	ServiceInformation *models.ServiceInformation
 }
 
 func (custom *CustomTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	for _, v := range custom.Routes {
+	req.Header.Add("X-Origin-Host", req.URL.Host)
+	ctx := context.Background()
+	backEnd := custom.ServiceInformation.GetNextPeer()
+
+	for _, v := range custom.ServiceInformation.Routes {
 		if strings.Contains(v.GatewayPath, req.URL.Path) {
 			reqBytes, err := ioutil.ReadAll(req.Body)
 			if err != nil {
 				return createResponse(err, nil, req), nil
 			}
-
 			req.Header.Set("Content-Type", "application/grpc+rawCodec")
-			clientStream, err := grpc.NewClientStream(custom.Context, &grpc.StreamDesc{
+			if !backEnd.Limiter.Limit() {
+				backEnd = custom.ServiceInformation.GetNextPeer()
+			}
+			clientStream, err := grpc.NewClientStream(ctx, &grpc.StreamDesc{
 				ServerStreams: true,
 				ClientStreams: true,
-			}, custom.grpcConn, v.ServicePath)
+			}, backEnd.GrpcClientConn, v.ServicePath)
 			if err != nil {
 				return createResponse(err, nil, req), nil
 			}
-
-			errCh1 := sendRequestToBackend(clientStream, reqBytes)
-			errCh2, retChan := retrieveResponseFromBackEnd(clientStream)
-			for i := 0; i < 3; i++ {
-				select {
-				case magErr := <-errCh1:
-					if !errors.Is(magErr, io.EOF) {
-						return createResponse(magErr, nil, req), nil
-					}
-					clientStream.CloseSend()
-				case magErr2 := <-errCh2:
-					if !errors.Is(magErr2, io.EOF) {
-						return createResponse(magErr2, nil, req), nil
-					}
-				case response := <-retChan:
-					return createResponse(nil, response, req), nil
-				}
+			response, err := utils.CreateBytesResponse(clientStream, reqBytes)
+			if err != nil {
+				//todo: may cause errors fix by adding response create
+				return nil, err
 			}
-			break
+			return createResponse(nil, response, req), nil
 		}
 	}
 
@@ -78,37 +58,6 @@ func (custom *CustomTransport) RoundTrip(req *http.Request) (*http.Response, err
 	}, nil
 }
 
-func retrieveResponseFromBackEnd(stream grpc.ClientStream) (chan error, chan []byte) {
-	errCh := make(chan error, 1)
-	retChan := make(chan []byte, 1)
-	var a []byte
-	go func() {
-		for {
-			if err := stream.RecvMsg(&a); err != nil {
-				if errors.Is(err, io.EOF) {
-					retChan <- a
-				}
-				errCh <- err
-				break
-			}
-		}
-
-	}()
-
-	return errCh, retChan
-}
-
-func sendRequestToBackend(stream grpc.ClientStream, info []byte) chan error {
-	ret := make(chan error, 1)
-	go func() {
-		for {
-			if err := stream.SendMsg(&info); err != nil {
-				ret <- err
-
-				break
-			}
-		}
-
-	}()
-	return ret
+func (custom *CustomTransport) SetServiceInformation(srvInfo *models.ServiceInformation) {
+	custom.ServiceInformation = srvInfo
 }

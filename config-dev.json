@@ -6,8 +6,12 @@
   "services": [
     {
       "service_identifier": "auth",
-      "host": "localhost",
-      "port": 8080,
+      "hosts": [
+        {
+          "host":"localhost:8080",
+          "healthy": false
+        }
+      ],
       "routes": [
         {
           "gateway_path": "/register",
@@ -21,8 +25,16 @@
     },
     {
       "service_identifier": "car",
-      "host": "localhost",
-      "port": 8082,
+      "hosts": [
+        {
+          "host":"localhost:8082",
+          "healthy": false
+        },
+        {
+          "host":"localhost:8089",
+          "healthy": false
+        }
+      ],
       "routes": [
         {
           "gateway_path": "/api/car/create",
