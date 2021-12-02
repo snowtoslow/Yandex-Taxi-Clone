@@ -3,6 +3,7 @@ package gateway
 import (
 	"Yandex-Taxi-Clone/internal/gateway/models"
 	"Yandex-Taxi-Clone/internal/transport"
+	"Yandex-Taxi-Clone/pkg/registry-handler"
 	"Yandex-Taxi-Clone/utils"
 	"context"
 	"encoding/json"
@@ -36,7 +37,7 @@ func New(
 }
 
 func (apiGateway *ApiGateway) RegisterServices() error {
-	for _, fromConfig := range apiGateway.ServiceInfoFromConfig {
+	/*for _, fromConfig := range apiGateway.ServiceInfoFromConfig {
 		checkedHostsWithStatuses := healthCheck(fromConfig.HostWithStatus, fromConfig.ServiceIdentifier)
 		backEnds, err := models.HostsWithStatusesToBackEnds(checkedHostsWithStatuses)
 		if err != nil {
@@ -46,6 +47,10 @@ func (apiGateway *ApiGateway) RegisterServices() error {
 			BackEnds: backEnds,
 			Routes:   fromConfig.Routes,
 		}
+	}*/
+	_, err := registry_handler.GetServiceInformationByIdentifier()
+	if err != nil {
+		return err
 	}
 	return nil
 }
